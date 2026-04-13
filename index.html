@@ -1,0 +1,378 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>P2P (New)</title>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" />
+    <link rel="stylesheet" href="style.css" />
+
+    <!-- Firebase (uses existing firebase-config.js) -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
+  </head>
+
+  <body>
+    <div class="app">
+      <!-- Top Bar -->
+      <header class="topbar">
+        <div class="topbar__left">
+          <div class="brand">P2P</div>
+          <button id="connectBtn" class="chip chip--danger" type="button" onclick="connectWallet()">
+            <i class="fa-solid fa-link-slash"></i>
+            <span>ربط المحفظة</span>
+          </button>
+        </div>
+        <div class="topbar__right">
+          <!-- (+) appears ONLY on "My Ads" page -->
+          <button id="headerPlusBtn" class="icon-btn" type="button" onclick="openCreateAd()" style="display:none" aria-label="إنشاء إعلان">
+            <i class="fa-solid fa-plus"></i>
+          </button>
+
+          <!-- Balance appears on P2P / Orders / Chat / Profile -->
+          <div id="headerBalance" class="balanceChip" style="display:none" role="button" tabindex="0" onclick="connectWallet()"
+               onkeypress="if(event.key==='Enter'){connectWallet()}" aria-label="رصيدك">
+            <i id="headerBalanceIcon" class="fa-solid fa-wallet"></i>
+            <span id="headerBalanceText">رصيدك: 0.00 USDT</span>
+          </div>
+        </div>
+      </header>
+
+      <!-- Market Page -->
+      <main id="marketPage" class="page page--active">
+        <div id="marketToggle" class="marketToggle marketToggle--sell" role="tablist" aria-label="Buy Sell Toggle">
+          <div class="marketToggle__thumb" aria-hidden="true"></div>
+          <button id="tabBuy" class="marketToggle__btn" type="button" onclick="setMarketTab('buy')" role="tab" aria-selected="false">
+            شراء
+          </button>
+          <button id="tabSell" class="marketToggle__btn marketToggle__btn--active" type="button" onclick="setMarketTab('sell')" role="tab" aria-selected="true">
+            بيع
+          </button>
+        </div>
+
+        <!-- OKX-style top filters row -->
+        <div class="filtersRow" aria-label="P2P filters">
+          <!-- Far right: USDT selector -->
+          <button id="filterUsdt" class="filterPill" type="button" onclick="openCurrencySelector()">
+            <span class="filterPill__label">USDT</span>
+            <i class="fa-solid fa-chevron-down"></i>
+          </button>
+          <!-- Left of Amount: Payment method -->
+          <button id="filterPayment" class="filterPill" type="button" onclick="openPaymentFilter()">
+            <span class="filterPill__label">طرق الدفع</span>
+            <i class="fa-solid fa-chevron-down"></i>
+          </button>
+          <!-- Middle: Amount -->
+          <button id="filterAmount" class="filterPill" type="button" onclick="openAmountFilter()">
+            <span class="filterPill__label">المبلغ</span>
+            <i class="fa-solid fa-chevron-down"></i>
+          </button>
+          <!-- Far left: Funnel icon -->
+          <button id="filterFunnel" class="filterIcon" type="button" onclick="openMoreFilters()" aria-label="فلترة">
+            <i class="fa-solid fa-filter"></i>
+          </button>
+        </div>
+
+        <div class="marketHeader">
+          <div class="pill">
+            <span class="pill__dot"></span>
+            <span>USDT</span>
+          </div>
+          <div class="pill pill--muted"><span>EGP</span></div>
+        </div>
+
+        <section id="adsList" class="list"></section>
+      </main>
+
+      <!-- Create Ad Page -->
+      <main id="createAdPage" class="page">
+        <div class="subheader">
+          <button class="icon-btn" type="button" onclick="backToMarket()">
+            <i class="fa-solid fa-arrow-right"></i>
+          </button>
+          <div class="subheader__title">نشر إعلان جديد</div>
+        </div>
+
+        <div class="createWrap">
+          <div class="segmented">
+            <button id="createModeBuy" class="segmented__btn segmented__btn--active" type="button" onclick="setCreateMode('buy')">
+              شراء
+            </button>
+            <button id="createModeSell" class="segmented__btn" type="button" onclick="setCreateMode('sell')">
+              بيع
+            </button>
+          </div>
+
+          <section class="card">
+            <div class="card__title">السعر</div>
+            <div class="field">
+              <label class="label">السعر الإفرادي</label>
+              <div class="input">
+                <input id="priceIn" type="number" inputmode="decimal" placeholder="0.00" />
+                <span class="suffix">EGP</span>
+              </div>
+            </div>
+          </section>
+
+          <div class="divider"></div>
+
+          <section class="card">
+            <div class="card__title">الكمية</div>
+            <div class="field">
+              <label class="label">الكمية (USDT)</label>
+              <div class="input input--muted">
+                <input id="quantityIn" type="number" inputmode="decimal" placeholder="0.00" />
+                <div class="inputActions">
+                  <span class="suffix">USDT</span>
+                  <button id="maxBtn" class="maxBtn maxBtn--inInput" type="button" onclick="fillMaxFromWallet()">الحد الأقصى</button>
+                </div>
+              </div>
+
+              <!-- SELL mode only: Max + wallet balance -->
+              <div id="sellOnlyBox" class="sellOnly" style="display: none">
+                <div class="subtext">المتاح: <span id="walletBalance">0.00</span> USDT</div>
+              </div>
+            </div>
+          </section>
+
+          <div class="divider"></div>
+
+          <section class="card">
+            <div class="card__title">حد المعاملة الواحدة</div>
+            <div class="limits">
+              <div class="input">
+                <input id="minLimitIn" type="number" inputmode="decimal" placeholder="الحد الأدنى (EGP)" />
+              </div>
+              <span class="tilde">~</span>
+              <div class="input">
+                <input id="maxLimitIn" type="number" inputmode="decimal" placeholder="الحد الأقصى (EGP)" />
+              </div>
+            </div>
+          </section>
+
+          <div class="divider"></div>
+
+          <section class="card">
+            <div class="card__title">طرق الدفع</div>
+            <div class="field">
+              <label class="label">طريقة الدفع</label>
+              <div class="select" role="button" tabindex="0" onclick="togglePaymentDropdown()" onkeypress="if(event.key==='Enter'){togglePaymentDropdown()}">
+                <span id="selectedPaymentText" class="select__text">اختر طريقة الدفع</span>
+                <i class="fa-solid fa-chevron-down"></i>
+              </div>
+              <div id="paymentDropdown" class="dropdown" style="display:none">
+                <button class="dropdown__item" type="button" onclick="selectPayment('Vodafone Cash')">Vodafone Cash</button>
+                <button class="dropdown__item" type="button" onclick="selectPayment('Instapay')">Instapay</button>
+                <button class="dropdown__item" type="button" onclick="selectPayment('Etisalat Cash')">Etisalat Cash</button>
+                <button class="dropdown__item" type="button" onclick="selectPayment('Banque Misr')">Banque Misr</button>
+                <button class="dropdown__item" type="button" onclick="selectPayment('AL MASHREQ Bank')">AL MASHREQ Bank</button>
+                <button class="dropdown__item" type="button" onclick="selectPayment('Ahlibank')">Ahlibank</button>
+                <button class="dropdown__item" type="button" onclick="selectPayment('Alex Bank')">Alex Bank</button>
+              </div>
+            </div>
+          </section>
+
+          <!-- Total Amount (Price * Quantity) -->
+          <div class="totalBar">
+            <div class="totalBar__label">المبلغ الإجمالي</div>
+            <div class="totalBar__value"><span id="totalAmount">0.00</span> EGP</div>
+          </div>
+
+          <button id="publishBtn" class="primaryBtn" type="button" disabled onclick="publishAd()">
+            نشر إعلان
+          </button>
+        </div>
+      </main>
+
+      <!-- Orders Page -->
+      <main id="ordersPage" class="page">
+        <div class="tabs tabs--small">
+          <button id="ordersTabActive" class="tab tab--active" type="button" onclick="setOrdersTab('active')">قيد التنفيذ</button>
+          <button id="ordersTabCompleted" class="tab" type="button" onclick="setOrdersTab('completed')">مكتمل</button>
+          <button id="ordersTabCanceled" class="tab" type="button" onclick="setOrdersTab('canceled')">ملغي</button>
+        </div>
+        <section id="ordersList" class="list"></section>
+      </main>
+
+      <!-- My Ads Page -->
+      <main id="adsPage" class="page">
+        <div class="pageTitle">إعلاناتي</div>
+        <div class="tabs tabs--small">
+          <button id="myAdsTabActive" class="tab tab--active" type="button" onclick="navTo('ads')">نشط (<span id="myAdsActiveCount">0</span>)</button>
+        </div>
+
+        <section id="myAdsEmpty" class="emptyState" style="display:none">
+          <div class="emptyState__icon" aria-hidden="true">
+            <!-- Minimal gray OKX-style illustration -->
+            <svg class="emptySvg" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg" fill="none">
+              <rect x="18" y="26" width="84" height="68" rx="14" stroke="currentColor" stroke-width="4"/>
+              <path d="M34 54h52" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
+              <path d="M34 68h36" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
+              <circle cx="42" cy="44" r="4" fill="currentColor"/>
+              <circle cx="54" cy="44" r="4" fill="currentColor"/>
+              <circle cx="66" cy="44" r="4" fill="currentColor"/>
+              <path d="M76 90h16" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
+            </svg>
+          </div>
+          <div class="emptyState__title">لم يتم العثور على إعلانات</div>
+          <div class="emptyState__sub">أنشئ إعلانًا لشراء العملات الرقمية أو بيعها.</div>
+          <button class="grayBtn" type="button" onclick="showCreateAdForm()">إنشاء إعلان</button>
+        </section>
+
+        <section id="myAdsList" class="list"></section>
+      </main>
+
+      <!-- Chat Page (list of active chats) -->
+      <main id="chatPage" class="page">
+        <div class="pageTitle">الدردشة</div>
+        <section id="chatList" class="list"></section>
+      </main>
+
+      <!-- Profile Page -->
+      <main id="profilePage" class="page">
+        <div class="pageTitle">صفحتي</div>
+        <div class="profileCard">
+          <div class="profileRow">
+            <div class="avatar avatar--lg">M</div>
+            <div class="profileMeta">
+              <div id="profileAddress" class="profileAddr">—</div>
+              <div class="meta">اربط محفظتك لعرض بياناتك</div>
+            </div>
+          </div>
+          <button class="primaryBtn" type="button" onclick="connectWallet()">ربط المحفظة</button>
+        </div>
+      </main>
+
+      <!-- Order Creation (OKX-style sheet) -->
+      <div id="orderOverlay" class="overlay" style="display: none">
+        <div class="orderSheet" role="dialog" aria-modal="true" aria-label="Create Order">
+          <div class="orderSheet__header">
+            <button class="icon-btn" type="button" onclick="closeOrder()" aria-label="Back">
+              <i class="fa-solid fa-arrow-right"></i>
+            </button>
+            <div class="orderSheet__titleWrap">
+              <div id="orderTitle" class="orderSheet__title">—</div>
+              <div class="orderSheet__meta">
+                TronLink <span id="orderTimer" class="orderSheet__window">(15 min payment window)</span>
+              </div>
+            </div>
+            <button class="icon-btn" type="button" onclick="closeOrder()" aria-label="Close">
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+          </div>
+
+          <div class="orderSheet__price">
+            <div class="orderSheet__priceLabel">السعر</div>
+            <div class="orderSheet__priceValue"><span id="orderPrice">0.00</span> <span class="unit">EGP</span></div>
+          </div>
+
+          <div class="orderSheet__panel">
+            <div class="orderSheet__dual">
+              <div class="orderSheet__row">
+                <div class="orderSheet__rowLabel">Amount</div>
+                <div class="orderInput">
+                  <input id="orderAmountIn" type="number" inputmode="decimal" placeholder="0.00" oninput="onOrderAmountInput()" />
+                  <span class="suffix">EGP</span>
+                  <button id="orderAllBtnAmount" class="miniBtn" type="button" onclick="orderAllAmount()">All</button>
+                </div>
+              </div>
+
+              <div class="orderSheet__swap" aria-hidden="true">
+                <i class="fa-solid fa-arrow-up-arrow-down"></i>
+              </div>
+
+              <div class="orderSheet__row">
+                <div class="orderSheet__rowLabel">Quantity</div>
+                <div class="orderInput">
+                  <input id="orderQtyIn" type="number" inputmode="decimal" placeholder="0.00" oninput="onOrderQtyInput()" />
+                  <span class="suffix">USDT</span>
+                  <button id="orderAllBtnQty" class="miniBtn" type="button" onclick="orderAllQty()">All</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="orderSheet__limits">
+              Limits: <b><span id="orderMinLimit">0.00</span> - <span id="orderMaxLimit">0.00</span></b> EGP
+              <span class="orderSheet__avail">• Available: <b><span id="orderAvailable">0.00</span></b> USDT</span>
+            </div>
+
+            <div class="orderSheet__payment">
+              <div class="orderSheet__paymentLeft">
+                <span class="orderPayIcon"><i id="orderPaymentIcon" class="fa-solid fa-building-columns"></i></span>
+                <div>
+                  <div class="orderSheet__paymentLabel">Payment Method</div>
+                  <div id="orderPaymentMethod" class="orderSheet__paymentValue">—</div>
+                </div>
+              </div>
+              <i class="fa-solid fa-chevron-left" style="color: var(--muted)"></i>
+            </div>
+
+            <div id="orderHint" class="hint" style="display: none"></div>
+
+            <button id="orderActionBtn" class="primaryBtn" type="button" disabled onclick="confirmOrder()">
+              Buy USDT with 0 Fees
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Toast -->
+      <div id="toast" class="toast" style="display: none"></div>
+
+      <!-- Chat Overlay (instant chat for active orders) -->
+      <div id="chatOverlay" class="chat" style="display:none">
+        <div class="chat__header">
+          <button class="icon-btn" type="button" onclick="closeChat()"><i class="fa-solid fa-arrow-right"></i></button>
+          <div class="chat__title">
+            <div id="chatOrderId" class="chat__order">طلب: —</div>
+            <div id="chatTimer" class="chat__timer">15:00</div>
+          </div>
+          <button class="icon-btn" type="button" onclick="closeChat()"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div id="chatBody" class="chat__body"></div>
+        <div class="chat__composer">
+          <input id="chatText" class="chat__input" type="text" placeholder="اكتب رسالتك..." />
+          <label class="chat__upload" title="إرسال صورة">
+            <input id="chatImage" type="file" accept="image/*" />
+            <i class="fa-solid fa-image"></i>
+          </label>
+          <button class="chat__send" type="button" onclick="sendChatMessage()"><i class="fa-solid fa-paper-plane"></i></button>
+        </div>
+      </div>
+
+      <!-- Bottom Navigation (OKX style) -->
+      <nav id="bottomNav" class="bottomNav" aria-label="Bottom Navigation">
+        <button class="bottomNav__item bottomNav__item--active" type="button" onclick="navTo('p2p')">
+          <i class="fa-solid fa-arrows-rotate"></i>
+          <span>P2P</span>
+        </button>
+        <button class="bottomNav__item" type="button" onclick="navTo('orders')">
+          <i class="fa-solid fa-file-invoice-dollar"></i>
+          <span>الطلبات</span>
+        </button>
+        <button class="bottomNav__item" type="button" onclick="navTo('ads')">
+          <i class="fa-solid fa-bullhorn"></i>
+          <span>إعلاناتي</span>
+        </button>
+        <button class="bottomNav__item" type="button" onclick="navTo('chat')">
+          <i class="fa-solid fa-comments"></i>
+          <span>الدردشة</span>
+        </button>
+        <button class="bottomNav__item" type="button" onclick="navTo('profile')">
+          <i class="fa-solid fa-user"></i>
+          <span>صفحتي</span>
+        </button>
+      </nav>
+    </div>
+
+    <!-- Module order (required) -->
+    <script src="firebase-config.js"></script>
+    <script src="wallet.js"></script>
+    <script src="ads.js"></script>
+    <script src="orders.js"></script>
+    <script src="chat.js"></script>
+  </body>
+</html>
