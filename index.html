@@ -120,23 +120,22 @@
           <div class="divider"></div>
 
           <section class="card">
-            <div class="card__title">الكمية</div>
-            <div class="field">
-              <label class="label">الكمية (USDT)</label>
-              <div class="input input--muted">
-                <input id="quantityIn" type="number" inputmode="decimal" placeholder="0.00" />
-                <div class="inputActions">
-                  <span class="suffix">USDT</span>
-                  <button id="maxBtn" class="maxBtn maxBtn--inInput" type="button" onclick="fillMaxFromWallet()">الحد الأقصى</button>
-                </div>
-              </div>
+  <div class="card__title">الكمية</div>
+  <div class="field">
+    <label class="label">الكمية (USDT)</label>
+    <div class="input input--muted">
+      <input id="adAmount" type="number" inputmode="decimal" placeholder="0.00" />
+      <div class="inputActions">
+        <span class="suffix">USDT</span>
+        <button id="maxBtn" class="maxBtn maxBtn--inInput" type="button" onclick="window.P2P.setMaxAmount()">الحد الأقصى</button>
+      </div>
+    </div>
 
-              <!-- SELL mode only: Max + wallet balance -->
-              <div id="sellOnlyBox" class="sellOnly" style="display: none">
-                <div class="subtext">المتاح: <span id="walletBalance">0.00</span> USDT</div>
-              </div>
-            </div>
-          </section>
+    <div id="sellOnlyBox" class="sellOnly" style="display: block">
+      <div class="subtext">المتاح: <span id="walletBalance">0.00</span> USDT</div>
+    </div>
+  </div>
+ </section>
 
           <div class="divider"></div>
 
@@ -242,7 +241,15 @@
               <div class="meta">اربط محفظتك لعرض بياناتك</div>
             </div>
           </div>
-          <button class="primaryBtn" type="button" onclick="connectWallet()">ربط المحفظة</button>
+          <div style="display: flex; gap: 10px; margin-top: 10px;">
+    <button class="primaryBtn" type="button" onclick="window.P2P.depositUSDT()" style="background-color: #28a745; flex: 1;">
+        <i class="fa-solid fa-arrow-down-to-bracket"></i> إيداع
+    </button>
+    <button id="withdrawBtn" class="primaryBtn" type="button" style="background-color: #dc3545; flex: 1;">
+    <i class="fa-solid fa-arrow-up-from-bracket"></i> سحب
+</button>
+        
+</div>
         </div>
       </main>
 
